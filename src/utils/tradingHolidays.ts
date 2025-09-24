@@ -38,3 +38,8 @@ export const isTradingDay = (dateString: string) => {
   const date = new Date(dateString);
   return !isWeekend(date) && !getTradingHoliday(dateString);
 };
+
+export const isNASDAQHoliday = (date: Date) => {
+  const dateString = date.toISOString().split('T')[0];
+  return !!getTradingHoliday(dateString);
+};
