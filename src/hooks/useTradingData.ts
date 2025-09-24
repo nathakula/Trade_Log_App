@@ -6,7 +6,7 @@ export function useTradingData() {
   const [entries, setEntries] = useState<TradingEntry[]>([]);
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
   const [monthlyNAV, setMonthlyNAV] = useState<MonthlyNAV[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const calculateMonthlyData = (entriesData: TradingEntry[]) => {
@@ -62,6 +62,7 @@ export function useTradingData() {
   const fetchEntries = async () => {
     try {
       setLoading(true);
+      setError(null);
       const { data, error } = await supabase
         .from('trading_entries')
         .select('*')
@@ -78,7 +79,7 @@ export function useTradingData() {
       
     } catch (err) {
       console.error('Error fetching entries:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch entries');
+      setError(err instanceof Error ? err.message : 'Failed to connect to database. Please check your Supabase connection.');
     } finally {
       setLoading(false);
     }
@@ -97,12 +98,18 @@ export function useTradingData() {
       setMonthlyNAV(data || []);
     } catch (err) {
       console.error('Error fetching monthly NAV:', err);
+      // Don't set error for NAV fetch failure, just log it
     }
   };
 
   useEffect(() => {
-    fetchEntries();
-    fetchMonthlyNAV();
+    // Only fetch if we have valid Supabase credentials
+    if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
+      fetchEntries();
+      fetchMonthlyNAV();
+    } else {
+      setError('Supabase configuration missing. Please connect to Supabase using the button in the top right.');
+    }
   }, []);
 
   const addEntry = async (entry: Omit<TradingEntry, 'id' | 'created_at' | 'updated_at'>) => {

@@ -126,9 +126,17 @@ function App() {
             </div>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">Connection Error</h2>
             <p className="text-gray-600 mb-4">{error}</p>
-            <p className="text-sm text-gray-500">
-              Please make sure you have connected to Supabase by clicking the "Connect to Supabase" button in the top right.
-            </p>
+            <div className="space-y-2">
+              <p className="text-sm text-gray-500">
+                Please make sure you have connected to Supabase by clicking the "Connect to Supabase" button in the top right.
+              </p>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Retry Connection
+              </button>
+            </div>
           </div>
         </div>
       </div>
