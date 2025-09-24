@@ -33,7 +33,8 @@ function App() {
     addBulkNAV,
     updateBulkNAV,
     updateEntry, 
-    deleteEntry 
+    deleteEntry,
+    updateMonthlyNAV
   } = useTradingData();
 
   const handleAddEntry = async (formData: DailyFormData) => {
@@ -95,6 +96,10 @@ function App() {
 
   const handleBulkNAVUpdate = async (updates: { id: string; data: Partial<MonthlyNAV> }[]) => {
     await updateBulkNAV(updates);
+  };
+
+  const handleMonthlyNAVUpdate = async (year: number, month: number, navValue: number) => {
+    await updateMonthlyNAV(year, month, navValue);
   };
 
   const selectedEntry = entries.find(entry => entry.date === selectedDate);
@@ -223,8 +228,10 @@ function App() {
                 <div className="lg:col-span-2">
                   <CalendarView
                     entries={entries}
+                    monthlyNAV={monthlyNAV}
                     onDateSelect={handleDateSelect}
                     onDateAdd={handleDateAdd}
+                    onUpdateNAV={handleMonthlyNAVUpdate}
                     selectedDate={selectedDate}
                   />
                 </div>

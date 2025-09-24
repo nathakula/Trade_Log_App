@@ -264,6 +264,41 @@ export const useTradingData = () => {
     updateBulkNAV,
     updateEntry,
     deleteEntry,
+    updateMonthlyNAV: async (year: number, month: number, navValue: number) => {
+      try {
+        // Check if NAV entry already exists for this month
+        const existingNAV = monthlyNAV.find(nav => nav.year === year && nav.month === month);
+        
+        if (existingNAV) {
+          // Update existing NAV entry
+          const { data, error } = await supabase
+            .from('monthly_nav')
+            .update({ 
+              nav_value: navValue, 
+              updated_at: new Date().toISOString() 
+            })
+            .eq('id', existingNAV.id)
+            .select()
+            .single();
+
+          if (error) throw error;
+        } else {
+          // Create new NAV entry
+          const { data, error } = await supabase
+            .from('monthly_nav')
+            .insert([{ year, month, nav_value: navValue }])
+            .select()
+            .single();
+
+          if (error) throw error;
+        }
+        
+        await fetchEntries(); // This will also fetch NAV data and trigger YTD refresh
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to update monthly NAV');
+        throw err;
+      }
+    },
     refetch: fetchEntries,
   };
 };

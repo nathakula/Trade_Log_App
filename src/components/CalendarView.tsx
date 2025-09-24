@@ -1,17 +1,28 @@
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, BarChart3, Edit2 } from 'lucide-react';
 import { TradingEntry } from '../types/trading';
 import { getTradingHoliday, isWeekend, isTradingDay } from '../utils/tradingHolidays';
+import { MonthlyNAVModal } from './MonthlyNAVModal';
 
 interface CalendarViewProps {
   entries: TradingEntry[];
+  monthlyNAV: MonthlyNAV[];
   onDateSelect: (date: string) => void;
   onDateAdd: (date: string) => void;
+  onUpdateNAV: (year: number, month: number, navValue: number) => Promise<void>;
   selectedDate?: string;
 }
 
-export const CalendarView: React.FC<CalendarViewProps> = ({ entries, onDateSelect, onDateAdd, selectedDate }) => {
+export const CalendarView: React.FC<CalendarViewProps> = ({ 
+  entries, 
+  monthlyNAV, 
+  onDateSelect, 
+  onDateAdd, 
+  onUpdateNAV,
+  selectedDate 
+}) => {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [showNAVModal, setShowNAVModal] = useState(false);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -33,6 +44,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ entries, onDateSelec
   entries.forEach(entry => {
     entriesByDate.set(entry.date, entry);
   });
+
+  // Get NAV for current month
+  const currentMonthNAV = monthlyNAV.find(nav => nav.year === year && nav.month === month + 1);
 
   const navigateMonth = (direction: 'prev' | 'next') => {
     setCurrentDate(new Date(year, month + (direction === 'next' ? 1 : -1), 1));
@@ -56,6 +70,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ entries, onDateSelec
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value);
+  };
+
+  const handleNAVUpdate = async (navValue: number) => {
+    await onUpdateNAV(year, month + 1, navValue);
+    setShowNAVModal(false);
   };
 
   const renderCalendarDays = () => {
@@ -203,6 +222,25 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ entries, onDateSelec
           >
             <ChevronRight className="w-5 h-5 text-gray-600 dark:text-gray-300" />
           </button>
+          
+          {/* Monthly NAV Update Button */}
+          <div className="flex items-center space-x-2 ml-4">
+            <button
+              onClick={() => setShowNAVModal(true)}
+              className="flex items-center space-x-2 px-3 py-2 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors duration-200"
+              title="Update monthly NAV"
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span className="text-sm font-medium">
+                {currentMonthNAV ? 'Edit NAV' : 'Add NAV'}
+              </span>
+            </button>
+            {currentMonthNAV && (
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                {formatCurrency(currentMonthNAV.nav_value)}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -242,6 +280,18 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ entries, onDateSelec
         {/* Calendar days */}
         {renderCalendarDays()}
       </div>
+
+      {/* Monthly NAV Modal */}
+      {showNAVModal && (
+        <MonthlyNAVModal
+          year={year}
+          month={month + 1}
+          monthName={monthNames[month]}
+          currentValue={currentMonthNAV?.nav_value}
+          onSave={handleNAVUpdate}
+          onClose={() => setShowNAVModal(false)}
+        />
+      )}
     </div>
   );
 };
