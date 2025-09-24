@@ -195,9 +195,10 @@ function App() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2">
                   <DailyEntryForm 
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Connection Error</h2>
-              <p className="text-gray-600 dark:text-gray-300 mb-4">{error}</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+                    onSubmit={handleAddEntry}
+                    initialDate={selectedDate}
+                    mode={formMode}
+                    onCancel={handleFormCancel}
                   />
                 </div>
                 <div>
