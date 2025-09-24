@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingUp, DollarSign, Calendar, BarChart3 } from 'lucide-react';
+import { TrendingUp, DollarSign, Calendar, BarChart3, ChevronDown } from 'lucide-react';
 import { MonthlyData, TradingEntry } from '../types/trading';
 import { useTheme } from '../hooks/useTheme';
 
@@ -11,23 +11,35 @@ interface YTDViewProps {
 export const YTDView: React.FC<YTDViewProps> = ({ monthlyData, entries }) => {
   const { theme } = useTheme();
   const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = React.useState(currentYear);
+  const [showYearDropdown, setShowYearDropdown] = React.useState(false);
   
   console.log('YTDView - monthlyData:', monthlyData);
   console.log('YTDView - entries:', entries);
   
-  const totalRealizedPnL = monthlyData.reduce((sum, month) => sum + month.total_realized_pnl, 0);
-  const totalEntries = entries.length;
+  // Filter data by selected year
+  const filteredMonthlyData = monthlyData.filter(month => month.year === selectedYear);
+  const filteredEntries = entries.filter(entry => {
+    const entryYear = new Date(entry.date).getFullYear();
+    return entryYear === selectedYear;
+  });
+  
+  // Get available years from data
+  const availableYears = [...new Set(monthlyData.map(month => month.year))].sort((a, b) => b - a);
+  
+  const totalRealizedPnL = filteredMonthlyData.reduce((sum, month) => sum + month.total_realized_pnl, 0);
+  const totalEntries = filteredEntries.length;
   
   // Get the most recent NAV value
   const getCurrentNAV = () => {
     console.log('Getting current NAV from monthlyData:', monthlyData);
     
-    if (monthlyData.length === 0) {
+    if (filteredMonthlyData.length === 0) {
       console.log('No monthly data, using default NAV: 250000');
       return 250000;
     }
     
-    const sortedData = [...monthlyData].sort((a, b) => {
+    const sortedData = [...filteredMonthlyData].sort((a, b) => {
       if (a.year !== b.year) return b.year - a.year;
       const monthOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       return monthOrder.indexOf(b.month) - monthOrder.indexOf(a.month);
@@ -57,7 +69,7 @@ export const YTDView: React.FC<YTDViewProps> = ({ monthlyData, entries }) => {
   };
 
   const getMaxValue = () => {
-    const pnlValues = monthlyData.map(d => Math.abs(d.total_realized_pnl));
+    const pnlValues = filteredMonthlyData.map(d => Math.abs(d.total_realized_pnl));
     return Math.max(...pnlValues, 50000); // Use a reasonable max for P&L bars
   };
 
@@ -65,7 +77,7 @@ export const YTDView: React.FC<YTDViewProps> = ({ monthlyData, entries }) => {
   
   // Calculate NAV range for the line chart
   const getNavRange = () => {
-    const navValues = monthlyData.filter(d => d.end_of_month_nav > 0).map(d => d.end_of_month_nav);
+    const navValues = filteredMonthlyData.filter(d => d.end_of_month_nav > 0).map(d => d.end_of_month_nav);
     if (navValues.length === 0) return { min: 250000, max: 400000 };
     
     const minNav = Math.min(...navValues);
@@ -86,6 +98,41 @@ export const YTDView: React.FC<YTDViewProps> = ({ monthlyData, entries }) => {
 
   return (
     <div className="space-y-6">
+      {/* Year Selector */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 transition-colors duration-200">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Year-to-Date Performance</h2>
+          <div className="relative">
+            <button
+              onClick={() => setShowYearDropdown(!showYearDropdown)}
+              className="flex items-center space-x-2 px-4 py-2 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
+            >
+              <span className="font-medium">{selectedYear}</span>
+              <ChevronDown className="w-4 h-4" />
+            </button>
+            
+            {showYearDropdown && (
+              <div className="absolute right-0 mt-2 w-32 bg-white dark:bg-gray-700 rounded-lg shadow-lg border border-gray-200 dark:border-gray-600 z-10">
+                {availableYears.map(year => (
+                  <button
+                    key={year}
+                    onClick={() => {
+                      setSelectedYear(year);
+                      setShowYearDropdown(false);
+                    }}
+                    className={`w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors ${
+                      year === selectedYear ? 'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
+                    } ${year === availableYears[0] ? 'rounded-t-lg' : ''} ${year === availableYears[availableYears.length - 1] ? 'rounded-b-lg' : ''}`}
+                  >
+                    {year}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 transition-colors duration-200">
@@ -128,12 +175,14 @@ export const YTDView: React.FC<YTDViewProps> = ({ monthlyData, entries }) => {
 
       {/* Monthly Chart */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 transition-colors duration-200">
-        <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6 text-center">Monthly Trading P&L vs End-of-Month NAV</h3>
+        <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6 text-center">
+          {selectedYear} Monthly Trading P&L vs End-of-Month NAV
+        </h3>
         
-        {monthlyData.length === 0 ? (
+        {filteredMonthlyData.length === 0 ? (
           <div className="text-center py-12 text-gray-500 dark:text-gray-400">
             <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p>No data available. Add some trading entries to see your performance.</p>
+            <p>No data available for {selectedYear}. Add some trading entries to see your performance.</p>
           </div>
         ) : (
           <div className={`relative rounded-xl p-6 ${theme === 'dark' ? 'bg-gray-900' : 'bg-white border border-gray-200'}`}>
@@ -185,11 +234,11 @@ export const YTDView: React.FC<YTDViewProps> = ({ monthlyData, entries }) => {
                   </defs>
                   
                   {/* NAV Area Fill */}
-                  {monthlyData.filter(month => month.end_of_month_nav > 0).length > 1 && (
+                  {filteredMonthlyData.filter(month => month.end_of_month_nav > 0).length > 1 && (
                     <path
                       fill="url(#navAreaGradient)"
                       stroke="none"
-                      d={`M ${monthlyData
+                      d={`M ${filteredMonthlyData
                         .filter(month => month.end_of_month_nav > 0)
                         .map((month, index, filteredData) => {
                           const x = filteredData.length > 1 ? (index / (filteredData.length - 1)) * 100 : 50;
@@ -200,54 +249,56 @@ export const YTDView: React.FC<YTDViewProps> = ({ monthlyData, entries }) => {
                   )}
                   
                   {/* NAV Line */}
-                  {monthlyData.filter(month => month.end_of_month_nav > 0).length > 0 && (
-                    <path
-                      fill="none"
-                      stroke="#3b82f6"
-                      strokeWidth="4"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      filter="drop-shadow(0 3px 6px rgba(59, 130, 246, 0.4))"
-                      d={(() => {
-                        const navData = monthlyData.filter(month => month.end_of_month_nav > 0);
-                        if (navData.length === 0) return '';
-                        if (navData.length === 1) {
-                          const x = 50;
-                          const y = 100 - ((navData[0].end_of_month_nav - navRange.min) / (navRange.max - navRange.min)) * 100;
-                          return `M ${x}%,${Math.max(0, Math.min(100, y))}% L ${x}%,${Math.max(0, Math.min(100, y))}%`;
-                        }
-                        return `M ${navData.map((month, index) => {
-                          const x = (index / (navData.length - 1)) * 100;
-                          const y = 100 - ((month.end_of_month_nav - navRange.min) / (navRange.max - navRange.min)) * 100;
-                          return `${x}%,${Math.max(0, Math.min(100, y))}%`;
-                        }).join(' L ')}`;
-                      })()}
-                    />
-                  )}
-                  
-                  {/* NAV Points */}
-                  {monthlyData
-                    .filter(month => month.end_of_month_nav > 0)
-                    .map((month, index, filteredData) => {
-                    const x = filteredData.length > 1 ? (index / (filteredData.length - 1)) * 100 : 50;
-                    const y = 100 - ((month.end_of_month_nav - navRange.min) / (navRange.max - navRange.min)) * 100;
+                  {(() => {
+                    const navData = filteredMonthlyData.filter(month => month.end_of_month_nav > 0);
+                    if (navData.length === 0) return null;
+                    
+                    // Create path points for the line
+                    const pathPoints = navData.map((month, index) => {
+                      const monthIndex = filteredMonthlyData.findIndex(m => m === month);
+                      const x = filteredMonthlyData.length > 1 ? (monthIndex / (filteredMonthlyData.length - 1)) * 100 : 50;
+                      const y = 100 - ((month.end_of_month_nav - navRange.min) / (navRange.max - navRange.min)) * 100;
+                      return { x: Math.max(0, Math.min(100, x)), y: Math.max(0, Math.min(100, y)) };
+                    });
+                    
+                    // Generate path string
+                    const pathString = pathPoints.length > 0 
+                      ? `M ${pathPoints.map(point => `${point.x}% ${point.y}%`).join(' L ')}`
+                      : '';
+                    
                     return (
-                      <circle
-                        key={`nav-${index}`}
-                        cx={`${x}%`}
-                        cy={`${Math.max(0, Math.min(100, y))}%`}
-                        r="4"
-                        fill="#3b82f6"
-                        stroke={theme === 'dark' ? '#1e293b' : '#ffffff'}
-                        strokeWidth="2"
-                        filter="drop-shadow(0 3px 6px rgba(59, 130, 246, 0.5))"
-                      />
+                      <g>
+                        {/* NAV Line */}
+                        {pathPoints.length > 1 && (
+                          <path
+                            fill="none"
+                            stroke="#1e40af"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d={pathString}
+                          />
+                        )}
+                        
+                        {/* NAV Points */}
+                        {pathPoints.map((point, index) => (
+                          <circle
+                            key={`nav-point-${index}`}
+                            cx={`${point.x}%`}
+                            cy={`${point.y}%`}
+                            r="4"
+                            fill="#1e40af"
+                            stroke={theme === 'dark' ? '#1e293b' : '#ffffff'}
+                            strokeWidth="2"
+                          />
+                        ))}
+                      </g>
                     );
-                  })}
+                  })()}
                 </svg>
                 
                 {/* P&L Bars */}
-                {monthlyData.map((month, index) => {
+                {filteredMonthlyData.map((month, index) => {
                   const barHeight = Math.max((Math.abs(month.total_realized_pnl) / maxPnLValue) * 240, 8);
                   const isProfit = month.total_realized_pnl >= 0;
                   
@@ -278,7 +329,7 @@ export const YTDView: React.FC<YTDViewProps> = ({ monthlyData, entries }) => {
 
             {/* X-axis labels */}
             <div className={`flex justify-between text-xs px-12 mb-4 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-              {monthlyData.map((month, index) => (
+              {filteredMonthlyData.map((month, index) => (
                 <div key={`label-${index}`} className="text-center font-medium">
                   {month.month}
                 </div>
@@ -312,11 +363,11 @@ export const YTDView: React.FC<YTDViewProps> = ({ monthlyData, entries }) => {
 
       {/* Monthly Breakdown Table */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 transition-colors duration-200">
-        <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">Monthly Breakdown</h3>
+        <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">{selectedYear} Monthly Breakdown</h3>
         
-        {monthlyData.length === 0 ? (
+        {filteredMonthlyData.length === 0 ? (
           <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-            No monthly data available yet.
+            No monthly data available for {selectedYear}.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -330,7 +381,7 @@ export const YTDView: React.FC<YTDViewProps> = ({ monthlyData, entries }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
-                {monthlyData.map((month, index) => (
+                {filteredMonthlyData.map((month, index) => (
                   <tr key={`${month.year}-${month.month}`} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
                     <td className="px-4 py-4 text-sm font-medium text-gray-900 dark:text-white">
                       {month.month} {month.year}
