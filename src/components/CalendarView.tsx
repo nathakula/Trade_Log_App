@@ -266,21 +266,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
       {/* Monthly Summary */}
       <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Total P&L */}
-          <div className="text-center">
-            <div className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
-              Total P&L
-            </div>
-            <div className={`text-lg font-bold ${
-              monthlyTotals.totalPnL > 0 ? 'text-green-600' :
-              monthlyTotals.totalPnL < 0 ? 'text-red-600' :
-              'text-gray-600'
-            }`}>
-              {formatCurrency(monthlyTotals.totalPnL)}
-            </div>
-          </div>
-
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Realized P&L */}
           <div className="text-center">
             <div className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
@@ -292,20 +278,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               'text-gray-600'
             }`}>
               {formatCurrency(monthlyTotals.totalRealizedPnL)}
-            </div>
-          </div>
-
-          {/* Paper P&L */}
-          <div className="text-center">
-            <div className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
-              Paper P&L
-            </div>
-            <div className={`text-lg font-bold ${
-              monthlyTotals.totalPaperPnL > 0 ? 'text-green-600' :
-              monthlyTotals.totalPaperPnL < 0 ? 'text-red-600' :
-              'text-gray-600'
-            }`}>
-              {formatCurrency(monthlyTotals.totalPaperPnL)}
             </div>
           </div>
 
