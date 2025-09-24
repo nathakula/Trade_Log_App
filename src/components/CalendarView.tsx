@@ -48,6 +48,26 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   // Get NAV for current month
   const currentMonthNAV = monthlyNAV.find(nav => nav.year === year && nav.month === month + 1);
 
+  // Calculate monthly totals for current month
+  const calculateMonthlyTotals = () => {
+    const currentMonthEntries = entries.filter(entry => {
+      const entryDate = new Date(entry.date);
+      return entryDate.getFullYear() === year && entryDate.getMonth() === month;
+    });
+
+    const totalRealizedPnL = currentMonthEntries.reduce((sum, entry) => sum + entry.realized_pnl, 0);
+    const totalPaperPnL = currentMonthEntries.reduce((sum, entry) => sum + entry.paper_pnl, 0);
+    const totalPnL = totalRealizedPnL + totalPaperPnL;
+
+    return {
+      totalRealizedPnL,
+      totalPaperPnL,
+      totalPnL,
+      entryCount: currentMonthEntries.length
+    };
+  };
+
+  const monthlyTotals = calculateMonthlyTotals();
   const navigateMonth = (direction: 'prev' | 'next') => {
     setCurrentDate(new Date(year, month + (direction === 'next' ? 1 : -1), 1));
   };
@@ -244,6 +264,69 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         </div>
       </div>
 
+      {/* Monthly Summary */}
+      <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Total P&L */}
+          <div className="text-center">
+            <div className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+              Total P&L
+            </div>
+            <div className={`text-lg font-bold ${
+              monthlyTotals.totalPnL > 0 ? 'text-green-600' :
+              monthlyTotals.totalPnL < 0 ? 'text-red-600' :
+              'text-gray-600'
+            }`}>
+              {formatCurrency(monthlyTotals.totalPnL)}
+            </div>
+          </div>
+
+          {/* Realized P&L */}
+          <div className="text-center">
+            <div className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+              Realized P&L
+            </div>
+            <div className={`text-lg font-bold ${
+              monthlyTotals.totalRealizedPnL > 0 ? 'text-green-600' :
+              monthlyTotals.totalRealizedPnL < 0 ? 'text-red-600' :
+              'text-gray-600'
+            }`}>
+              {formatCurrency(monthlyTotals.totalRealizedPnL)}
+            </div>
+          </div>
+
+          {/* Paper P&L */}
+          <div className="text-center">
+            <div className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+              Paper P&L
+            </div>
+            <div className={`text-lg font-bold ${
+              monthlyTotals.totalPaperPnL > 0 ? 'text-green-600' :
+              monthlyTotals.totalPaperPnL < 0 ? 'text-red-600' :
+              'text-gray-600'
+            }`}>
+              {formatCurrency(monthlyTotals.totalPaperPnL)}
+            </div>
+          </div>
+
+          {/* End-of-Month NAV */}
+          <div className="text-center">
+            <div className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+              End-of-Month NAV
+            </div>
+            <div className="text-lg font-bold text-blue-800 dark:text-blue-400">
+              {currentMonthNAV ? formatCurrency(currentMonthNAV.nav_value) : 'Not Set'}
+            </div>
+          </div>
+        </div>
+
+        {/* Trading Days Count */}
+        <div className="mt-3 text-center">
+          <span className="text-sm text-gray-600 dark:text-gray-400">
+            Trading Days: <span className="font-medium">{monthlyTotals.entryCount}</span>
+          </span>
+        </div>
+      </div>
       {/* Legend */}
       <div className="flex flex-wrap items-center justify-center gap-6 mb-4 text-sm text-gray-600 dark:text-gray-300">
         <div className="flex items-center space-x-2">
