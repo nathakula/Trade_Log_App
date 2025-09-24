@@ -14,8 +14,24 @@ export const YTDView: React.FC<YTDViewProps> = ({ monthlyData, entries }) => {
   const [selectedYear, setSelectedYear] = React.useState(currentYear);
   const [showYearDropdown, setShowYearDropdown] = React.useState(false);
   
-  console.log('YTDView - monthlyData:', monthlyData);
-  console.log('YTDView - entries:', entries);
+  // Debug P&L calculation for August
+  const augustEntries = entries.filter(entry => {
+    const entryDate = new Date(entry.date);
+    return entryDate.getFullYear() === selectedYear && entryDate.getMonth() === 7; // August = month 7
+  });
+  
+  console.log('=== AUGUST P&L DEBUG ===');
+  console.log('August entries:', augustEntries);
+  console.log('August entries count:', augustEntries.length);
+  
+  const augustRealizedTotal = augustEntries.reduce((sum, entry) => {
+    console.log(`Entry ${entry.date}: ${entry.realized_pnl}`);
+    return sum + entry.realized_pnl;
+  }, 0);
+  
+  console.log('Calculated August total:', augustRealizedTotal);
+  console.log('Monthly data August:', monthlyData.find(m => m.month === 'Aug' && m.year === selectedYear));
+  console.log('=== END DEBUG ===');
   
   // Filter data by selected year
   const filteredMonthlyData = monthlyData.filter(month => month.year === selectedYear);
@@ -249,48 +265,62 @@ export const YTDView: React.FC<YTDViewProps> = ({ monthlyData, entries }) => {
                   )}
                   
                   {/* NAV Line */}
-                  {(() => {
-                    const navData = filteredMonthlyData.filter(month => month.end_of_month_nav > 0);
-                    if (navData.length === 0) return null;
+                  {filteredMonthlyData.length > 0 && (() => {
+                    // Create NAV line path
+                    const navPoints = [];
                     
-                    // Create path points for the line
-                    const pathPoints = navData.map((month, index) => {
-                      const monthIndex = filteredMonthlyData.findIndex(m => m === month);
-                      const x = filteredMonthlyData.length > 1 ? (monthIndex / (filteredMonthlyData.length - 1)) * 100 : 50;
-                      const y = 100 - ((month.end_of_month_nav - navRange.min) / (navRange.max - navRange.min)) * 100;
-                      return { x: Math.max(0, Math.min(100, x)), y: Math.max(0, Math.min(100, y)) };
+                    filteredMonthlyData.forEach((month, index) => {
+                      if (month.end_of_month_nav > 0) {
+                        const x = filteredMonthlyData.length > 1 ? (index / (filteredMonthlyData.length - 1)) * 100 : 50;
+                        const y = 100 - ((month.end_of_month_nav - navRange.min) / (navRange.max - navRange.min)) * 100;
+                        navPoints.push({
+                          x: Math.max(0, Math.min(100, x)),
+                          y: Math.max(5, Math.min(95, y)), // Keep points within visible area
+                          month: month.month,
+                          value: month.end_of_month_nav
+                        });
+                      }
                     });
                     
-                    // Generate path string
-                    const pathString = pathPoints.length > 0 
-                      ? `M ${pathPoints.map(point => `${point.x}% ${point.y}%`).join(' L ')}`
-                      : '';
+                    if (navPoints.length === 0) return null;
+                    
+                    // Create the path string for the line
+                    const pathData = navPoints.map((point, index) => 
+                      `${index === 0 ? 'M' : 'L'} ${point.x}% ${point.y}%`
+                    ).join(' ');
+                    
+                    console.log('NAV Points:', navPoints);
+                    console.log('Path Data:', pathData);
                     
                     return (
                       <g>
-                        {/* NAV Line */}
-                        {pathPoints.length > 1 && (
+                        {/* NAV Line - only show if we have multiple points */}
+                        {navPoints.length > 1 && (
                           <path
+                            d={pathData}
                             fill="none"
                             stroke="#1e40af"
-                            strokeWidth="3"
+                            strokeWidth="4"
                             strokeLinecap="round"
                             strokeLinejoin="round"
-                            d={pathString}
+                            opacity="0.9"
                           />
                         )}
                         
-                        {/* NAV Points */}
-                        {pathPoints.map((point, index) => (
+                        {/* NAV Data Points */}
+                        {navPoints.map((point, index) => (
                           <circle
-                            key={`nav-point-${index}`}
+                            key={`nav-${index}`}
                             cx={`${point.x}%`}
                             cy={`${point.y}%`}
-                            r="4"
+                            r="5"
                             fill="#1e40af"
-                            stroke={theme === 'dark' ? '#1e293b' : '#ffffff'}
+                            stroke={theme === 'dark' ? '#1f2937' : '#ffffff'}
                             strokeWidth="2"
-                          />
+                            opacity="1"
+                          >
+                            <title>{`${point.month}: ${formatCurrency(point.value)}`}</title>
+                          </circle>
                         ))}
                       </g>
                     );
