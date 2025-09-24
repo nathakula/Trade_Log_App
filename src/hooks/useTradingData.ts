@@ -49,11 +49,13 @@ export const useTradingData = () => {
   };
 
   const calculateMonthlyData = (entries: TradingEntry[], navData: MonthlyNAV[]) => {
+    // Always start with a fresh map to prevent accumulation
     const monthlyMap = new Map<string, MonthlyData>();
     
     console.log('=== CALCULATING MONTHLY DATA ===');
     console.log('Trading entries:', entries.length);
     console.log('NAV records:', navData.length);
+    console.log('Entries being processed:', entries.map(e => ({ date: e.date, realized: e.realized_pnl, id: e.id })));
 
     // First, process all NAV data to create month entries
     navData.forEach(nav => {
@@ -77,15 +79,22 @@ export const useTradingData = () => {
     });
 
     // Then, process trading entries and add P&L data (ensuring no duplicates)
-    const processedEntries = new Set<string>(); // Track processed entry IDs
+    // Group entries by date to handle any potential duplicates at the date level
+    const entriesByDate = new Map<string, TradingEntry>();
     
     entries.forEach((entry) => {
-      // Skip if we've already processed this entry (prevent duplicates)
-      if (processedEntries.has(entry.id)) {
-        console.warn('Skipping duplicate entry:', entry.id, entry.date);
-        return;
+      const existingEntry = entriesByDate.get(entry.date);
+      if (existingEntry) {
+        console.warn('Multiple entries found for date:', entry.date, 'Using latest entry:', entry.id);
       }
-      processedEntries.add(entry.id);
+      // Always use the latest entry for each date (this handles any duplicates)
+      entriesByDate.set(entry.date, entry);
+    });
+    
+    console.log('Unique entries by date:', Array.from(entriesByDate.entries()).map(([date, entry]) => ({ date, realized: entry.realized_pnl, id: entry.id })));
+    
+    // Process the deduplicated entries
+    entriesByDate.forEach((entry) => {
       
       const date = new Date(entry.date);
       const monthKey = `${date.getFullYear()}-${date.getMonth() + 1}`;
@@ -114,7 +123,10 @@ export const useTradingData = () => {
       console.log(`Month ${key}: Realized P&L = ${data.total_realized_pnl}, Entry Count = ${data.entry_count}`);
     });
     
-    console.log('Final monthly map:', Array.from(monthlyMap.entries()));
+    console.log('=== FINAL MONTHLY CALCULATIONS ===');
+    Array.from(monthlyMap.entries()).forEach(([key, data]) => {
+      console.log(`${key}: Realized=${data.total_realized_pnl}, Paper=${data.total_paper_pnl}, Count=${data.entry_count}, NAV=${data.end_of_month_nav}`);
+    });
     
     const sortedMonthlyData = Array.from(monthlyMap.values()).sort((a, b) => {
       if (a.year !== b.year) return a.year - b.year;
@@ -129,7 +141,8 @@ export const useTradingData = () => {
   useEffect(() => {
     console.log('=== USEEFFECT TRIGGERED ===');
     console.log('useEffect triggered - entries:', entries.length, 'NAV:', monthlyNAV.length);
-    if (entries.length >= 0 && monthlyNAV.length >= 0) { // Changed from > 0 to >= 0 to handle empty states
+    // Only recalculate if we have actual data changes
+    if (entries.length >= 0 && monthlyNAV.length >= 0) {
       calculateMonthlyData(entries, monthlyNAV);
     }
   }, [entries, monthlyNAV]); // Watch both entries and NAV for changes
