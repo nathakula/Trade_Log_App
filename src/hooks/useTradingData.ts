@@ -49,59 +49,45 @@ export const useTradingData = () => {
   };
 
   const calculateMonthlyData = (entries: TradingEntry[], navData: MonthlyNAV[]) => {
-    // Always start with a fresh map to prevent accumulation
-    const monthlyMap = new Map<string, MonthlyData>();
+    console.log('=== CALCULATING MONTHLY DATA (FRESH START) ===');
+    console.log('Input entries:', entries.length);
+    console.log('Input NAV records:', navData.length);
     
-    console.log('=== CALCULATING MONTHLY DATA ===');
-    console.log('Trading entries:', entries.length);
-    console.log('NAV records:', navData.length);
-    console.log('Entries being processed:', entries.map(e => ({ date: e.date, realized: e.realized_pnl, id: e.id })));
+    // CRITICAL: Always start with a completely fresh map to prevent accumulation
+    const monthlyMap = new Map<string, MonthlyData>();
 
-    // First, process all NAV data to create month entries
+    // Step 1: Initialize months with NAV data (zero P&L)
     navData.forEach(nav => {
       const monthKey = `${nav.year}-${nav.month}`;
-      
-      if (!monthlyMap.has(monthKey)) {
-        const date = new Date(nav.year, nav.month - 1);
-        monthlyMap.set(monthKey, {
-          month: date.toLocaleString('default', { month: 'short' }),
-          year: nav.year,
-          total_realized_pnl: 0,
-          total_paper_pnl: 0,
-          end_of_month_nav: nav.nav_value,
-          entry_count: 0,
-        });
-      } else {
-        // Update existing month with NAV data
-        const monthData = monthlyMap.get(monthKey)!;
-        monthData.end_of_month_nav = nav.nav_value;
-      }
+      const date = new Date(nav.year, nav.month - 1);
+      monthlyMap.set(monthKey, {
+        month: date.toLocaleString('default', { month: 'short' }),
+        year: nav.year,
+        total_realized_pnl: 0, // Start fresh
+        total_paper_pnl: 0,    // Start fresh
+        end_of_month_nav: nav.nav_value,
+        entry_count: 0,        // Start fresh
+      });
     });
 
-    // Then, process trading entries and add P&L data (ensuring no duplicates)
-    // Group entries by date to handle any potential duplicates at the date level
+    // Step 2: Deduplicate entries by date (keep latest entry per date)
     const entriesByDate = new Map<string, TradingEntry>();
-    
     entries.forEach((entry) => {
-      const existingEntry = entriesByDate.get(entry.date);
-      if (existingEntry) {
-        console.warn('Multiple entries found for date:', entry.date, 'Using latest entry:', entry.id);
-      }
-      // Always use the latest entry for each date (this handles any duplicates)
       entriesByDate.set(entry.date, entry);
     });
     
-    console.log('Unique entries by date:', Array.from(entriesByDate.entries()).map(([date, entry]) => ({ date, realized: entry.realized_pnl, id: entry.id })));
+    console.log('Deduplicated entries by date:', entriesByDate.size);
     
-    // Process the deduplicated entries
+    // Step 3: Process each unique entry and add to monthly totals
     entriesByDate.forEach((entry) => {
-      
       const date = new Date(entry.date);
       const monthKey = `${date.getFullYear()}-${date.getMonth() + 1}`;
-      console.log('Processing entry:', entry.date, 'P&L:', entry.realized_pnl, 'Month:', monthKey);
+      
+      console.log(`Processing: ${entry.date} -> Month: ${monthKey}, Realized: ${entry.realized_pnl}, Paper: ${entry.paper_pnl}`);
       
       if (!monthlyMap.has(monthKey)) {
-        // Create month entry if it doesn't exist (fallback for months without NAV)
+        // Create month if it doesn't exist (for months without NAV data)
+        const date = new Date(entry.date);
         monthlyMap.set(monthKey, {
           month: date.toLocaleString('default', { month: 'short' }),
           year: date.getFullYear(),
@@ -113,7 +99,7 @@ export const useTradingData = () => {
       }
 
       const monthData = monthlyMap.get(monthKey)!;
-      monthData.total_realized_pnl += entry.realized_pnl;
+      monthData.total_realized_pnl += entry.realized_pnl; // Add to running total
       monthData.total_paper_pnl += entry.paper_pnl;
       monthData.entry_count += 1;
     });
@@ -121,7 +107,7 @@ export const useTradingData = () => {
     // Log final totals for verification
     monthlyMap.forEach((data, key) => {
       console.log(`Month ${key}: Realized P&L = ${data.total_realized_pnl}, Entry Count = ${data.entry_count}`);
-    });
+    });    
     
     console.log('=== FINAL MONTHLY CALCULATIONS ===');
     Array.from(monthlyMap.entries()).forEach(([key, data]) => {
@@ -137,15 +123,6 @@ export const useTradingData = () => {
     setMonthlyData(sortedMonthlyData);
   };
 
-  // Auto-refresh monthly data when entries or NAV changes
-  useEffect(() => {
-    console.log('=== USEEFFECT TRIGGERED ===');
-    console.log('useEffect triggered - entries:', entries.length, 'NAV:', monthlyNAV.length);
-    // Only recalculate if we have actual data changes
-    if (entries.length >= 0 && monthlyNAV.length >= 0) {
-      calculateMonthlyData(entries, monthlyNAV);
-    }
-  }, [entries, monthlyNAV]); // Watch both entries and NAV for changes
 
   const addEntry = async (entry: Omit<TradingEntry, 'id' | 'created_at' | 'updated_at'>) => {
     try {
