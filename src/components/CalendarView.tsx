@@ -255,11 +255,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 {currentMonthNAV ? 'Edit NAV' : 'Add NAV'}
               </span>
             </button>
-            {currentMonthNAV && (
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                {formatCurrency(currentMonthNAV.nav_value)}
-              </div>
-            )}
           </div>
         </div>
       </div>
