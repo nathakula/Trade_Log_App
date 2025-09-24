@@ -97,13 +97,13 @@ function App() {
     await updateBulkNAV(updates);
   };
 
+  const selectedEntry = entries.find(entry => entry.date === selectedDate);
   const formMode = selectedEntry ? 'edit' : 'add';
   
   const handleFormCancel = () => {
     setSelectedDate('');
   };
 
-  const selectedEntry = entries.find(entry => entry.date === selectedDate);
 
   const navItems = [
     { id: 'entry', label: 'Daily Entry', icon: PlusCircle },
