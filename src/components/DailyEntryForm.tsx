@@ -1,22 +1,15 @@
-import React, { useState } from 'react';
-import { PlusCircle, DollarSign, TrendingUp, FileText } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Calendar, DollarSign, FileText, Save, X } from 'lucide-react';
 import { DailyFormData } from '../types/trading';
 
 interface DailyEntryFormProps {
-  onSubmit: (data: DailyFormData) => Promise<void>;
-  loading?: boolean;
+  onSubmit: (data: DailyFormData) => void;
   initialDate?: string;
   mode?: 'add' | 'edit';
   onCancel?: () => void;
 }
 
-export const DailyEntryForm: React.FC<DailyEntryFormProps> = ({ 
-  onSubmit, 
-  loading = false, 
-  initialDate, 
-  mode = 'add', 
-  onCancel 
-}) => {
+export function DailyEntryForm({ onSubmit, initialDate = '', mode = 'add', onCancel }: DailyEntryFormProps) {
   const [formData, setFormData] = useState<DailyFormData>({
     date: initialDate || new Date().toISOString().split('T')[0],
     realized_pnl: '',
@@ -24,14 +17,18 @@ export const DailyEntryForm: React.FC<DailyEntryFormProps> = ({
     notes: '',
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.date || formData.realized_pnl === '' || formData.paper_pnl === '') {
-      return;
+  useEffect(() => {
+    if (initialDate) {
+      setFormData(prev => ({ ...prev, date: initialDate }));
     }
+  }, [initialDate]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit(formData);
     
-    await onSubmit(formData);
     if (mode === 'add') {
+      // Reset form for add mode
       setFormData({
         date: new Date().toISOString().split('T')[0],
         realized_pnl: '',
@@ -39,151 +36,106 @@ export const DailyEntryForm: React.FC<DailyEntryFormProps> = ({
         notes: '',
       });
     }
-    
-    if (onCancel) {
-      onCancel();
-    }
   };
 
-  const formatCurrency = (value: string) => {
-    const num = parseFloat(value);
-    return isNaN(num) ? value : num.toLocaleString('en-US', { 
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2 
-    });
-  };
-
-  const getCurrencyColor = (value: string) => {
-    const num = parseFloat(value);
-    if (isNaN(num) || num === 0) return 'text-gray-900';
-    return num > 0 ? 'text-green-600' : 'text-red-600';
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 transition-colors duration-200">
-      <div className="flex items-center space-x-3 mb-6">
-        <PlusCircle className="w-6 h-6 text-blue-600" />
+      <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-          {mode === 'edit' ? 'Edit Daily Entry' : 'Add Daily Entry'}
+          {mode === 'edit' ? 'Edit Entry' : 'Daily Trading Entry'}
         </h2>
+        {mode === 'edit' && onCancel && (
+          <button
+            onClick={onCancel}
+            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Date Input */}
-          <div>
-            <label htmlFor="date" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Date
-            </label>
-            <input
-              type="date"
-              id="date"
-              value={formData.date}
-              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              required
-            />
-          </div>
+        <div>
+          <label htmlFor="date" className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <Calendar className="w-4 h-4 mr-2" />
+            Trading Date
+          </label>
+          <input
+            type="date"
+            id="date"
+            name="date"
+            value={formData.date}
+            onChange={handleChange}
+            required
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-200"
+          />
+        </div>
 
-          {/* Realized P&L */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label htmlFor="realized_pnl" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              <div className="flex items-center space-x-2">
-                <DollarSign className="w-4 h-4" />
-                <span>Realized P&L</span>
-              </div>
+            <label htmlFor="realized_pnl" className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <DollarSign className="w-4 h-4 mr-2" />
+              Realized P&L
             </label>
             <input
               type="number"
               id="realized_pnl"
-              step="0.01"
+              name="realized_pnl"
               value={formData.realized_pnl}
-              onChange={(e) => setFormData({ ...formData, realized_pnl: e.target.value })}
+              onChange={handleChange}
+              step="0.01"
               placeholder="0.00"
-              className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${getCurrencyColor(formData.realized_pnl)}`}
-              required
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-200"
             />
-            {formData.realized_pnl && (
-              <p className={`text-sm mt-1 ${getCurrencyColor(formData.realized_pnl)}`}>
-                ${formatCurrency(formData.realized_pnl)}
-              </p>
-            )}
           </div>
 
-          {/* Paper P&L */}
           <div>
-            <label htmlFor="paper_pnl" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              <div className="flex items-center space-x-2">
-                <TrendingUp className="w-4 h-4" />
-                <span>Paper P&L</span>
-              </div>
+            <label htmlFor="paper_pnl" className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <DollarSign className="w-4 h-4 mr-2" />
+              Paper P&L
             </label>
             <input
               type="number"
               id="paper_pnl"
-              step="0.01"
+              name="paper_pnl"
               value={formData.paper_pnl}
-              onChange={(e) => setFormData({ ...formData, paper_pnl: e.target.value })}
+              onChange={handleChange}
+              step="0.01"
               placeholder="0.00"
-              className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${getCurrencyColor(formData.paper_pnl)}`}
-              required
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-200"
             />
-            {formData.paper_pnl && (
-              <p className={`text-sm mt-1 ${getCurrencyColor(formData.paper_pnl)}`}>
-                ${formatCurrency(formData.paper_pnl)}
-              </p>
-            )}
           </div>
         </div>
 
-        {/* Notes */}
         <div>
-          <label htmlFor="notes" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            <div className="flex items-center space-x-2">
-              <FileText className="w-4 h-4" />
-              <span>Notes & Highlights</span>
-            </div>
+          <label htmlFor="notes" className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <FileText className="w-4 h-4 mr-2" />
+            Notes (Optional)
           </label>
           <textarea
             id="notes"
-            rows={3}
+            name="notes"
             value={formData.notes}
-            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-            placeholder="Enter any notes, insights, or highlights from today's trading..."
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            onChange={handleChange}
+            rows={4}
+            placeholder="Add any notes about today's trading..."
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-200 resize-none"
           />
         </div>
 
-        {/* Submit Button */}
-        <div className="flex justify-end space-x-3">
-          {onCancel && (
-            <button
-              type="button"
-              onClick={onCancel}
-              className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors duration-200"
-            >
-              Cancel
-            </button>
-          )}
-          <button
-            type="submit"
-            disabled={loading}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-medium transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-          >
-            {loading ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                <span>{mode === 'edit' ? 'Updating...' : 'Adding...'}</span>
-              </>
-            ) : (
-              <>
-                <PlusCircle className="w-4 h-4" />
-                <span>{mode === 'edit' ? 'Update Entry' : 'Add Entry'}</span>
-              </>
-            )}
-          </button>
-        </div>
+        <button
+          type="submit"
+          className="w-full flex items-center justify-center space-x-2 bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200 font-medium"
+        >
+          <Save className="w-4 h-4" />
+          <span>{mode === 'edit' ? 'Update Entry' : 'Save Entry'}</span>
+        </button>
       </form>
     </div>
   );
-};
+}

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, BarChart3, Edit2 } from 'lucide-react';
-import { TradingEntry } from '../types/trading';
-import { getTradingHoliday, isWeekend, isTradingDay } from '../utils/tradingHolidays';
+import { ChevronLeft, ChevronRight, Edit, Plus } from 'lucide-react';
+import { TradingEntry, MonthlyNAV } from '../types/trading';
 import { MonthlyNAVModal } from './MonthlyNAVModal';
+import { isWeekend, isNASDAQHoliday } from '../utils/tradingHolidays';
 
 interface CalendarViewProps {
   entries: TradingEntry[];
@@ -13,14 +13,14 @@ interface CalendarViewProps {
   selectedDate?: string;
 }
 
-export const CalendarView: React.FC<CalendarViewProps> = ({ 
+export function CalendarView({ 
   entries, 
   monthlyNAV, 
   onDateSelect, 
   onDateAdd, 
   onUpdateNAV,
   selectedDate 
-}) => {
+}: CalendarViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showNAVModal, setShowNAVModal] = useState(false);
 
@@ -29,7 +29,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   const firstDayOfMonth = new Date(year, month, 1);
   const lastDayOfMonth = new Date(year, month + 1, 0);
-  const firstDayWeekday = firstDayOfMonth.getDay();
+  const firstDayOfWeek = firstDayOfMonth.getDay();
   const daysInMonth = lastDayOfMonth.getDate();
 
   const monthNames = [
@@ -37,298 +37,242 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
-  const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-  // Create a map of entries by date
-  const entriesByDate = new Map<string, TradingEntry>();
-  entries.forEach(entry => {
-    entriesByDate.set(entry.date, entry);
-  });
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    setCurrentDate(prev => {
+      const newDate = new Date(prev);
+      if (direction === 'prev') {
+        newDate.setMonth(prev.getMonth() - 1);
+      } else {
+        newDate.setMonth(prev.getMonth() + 1);
+      }
+      return newDate;
+    });
+  };
 
-  // Get NAV for current month
-  const currentMonthNAV = monthlyNAV.find(nav => nav.year === year && nav.month === month + 1);
+  const getEntryForDate = (date: string) => {
+    return entries.find(entry => entry.date === date);
+  };
 
-  // Calculate monthly totals for current month
-  const calculateMonthlyTotals = () => {
-    const currentMonthEntries = entries.filter(entry => {
+  const getCurrentMonthNAV = () => {
+    return monthlyNAV.find(nav => nav.year === year && nav.month === month + 1);
+  };
+
+  const getMonthlyTotals = () => {
+    const monthEntries = entries.filter(entry => {
       const entryDate = new Date(entry.date);
       return entryDate.getFullYear() === year && entryDate.getMonth() === month;
     });
 
-    const totalRealizedPnL = currentMonthEntries.reduce((sum, entry) => sum + entry.realized_pnl, 0);
-    const totalPaperPnL = currentMonthEntries.reduce((sum, entry) => sum + entry.paper_pnl, 0);
-    const totalPnL = totalRealizedPnL + totalPaperPnL;
+    const realized = monthEntries.reduce((sum, entry) => sum + entry.realized_pnl, 0);
+    const tradingDays = monthEntries.length;
 
-    return {
-      totalRealizedPnL,
-      totalPaperPnL,
-      totalPnL,
-      entryCount: currentMonthEntries.length
-    };
+    return { realized, tradingDays };
   };
 
-  const monthlyTotals = calculateMonthlyTotals();
-  const navigateMonth = (direction: 'prev' | 'next') => {
-    setCurrentDate(new Date(year, month + (direction === 'next' ? 1 : -1), 1));
-  };
-
-  const formatDate = (day: number) => {
-    return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-  };
-
-  const getEntryStatus = (entry: TradingEntry | undefined) => {
-    if (!entry) return null;
-    if (entry.realized_pnl > 0) return 'profit';
-    if (entry.realized_pnl < 0) return 'loss';
-    return 'neutral';
-  };
-
-  const formatCurrency = (value: number) => {
+  const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
+    }).format(amount);
   };
 
-  const handleNAVUpdate = async (navValue: number) => {
-    await onUpdateNAV(year, month + 1, navValue);
-    setShowNAVModal(false);
-  };
+  const renderCalendarDay = (day: number) => {
+    const date = new Date(year, month, day);
+    const dateString = date.toISOString().split('T')[0];
+    const entry = getEntryForDate(dateString);
+    const isSelected = selectedDate === dateString;
+    const isWeekendDay = isWeekend(date);
+    const isHoliday = isNASDAQHoliday(date);
+    const isNonTradingDay = isWeekendDay || isHoliday;
 
-  const renderCalendarDays = () => {
-    const days = [];
-
-    // Add empty cells for days before the first day of the month
-    for (let i = 0; i < firstDayWeekday; i++) {
-      days.push(<div key={`empty-${i}`} className="h-24 bg-gray-50 border border-gray-200"></div>);
+    let dayClass = 'h-24 p-2 border border-gray-200 dark:border-gray-600 transition-colors duration-200 ';
+    
+    if (isSelected) {
+      dayClass += 'bg-blue-100 dark:bg-blue-900 border-blue-300 dark:border-blue-600 ';
+    } else if (isNonTradingDay) {
+      dayClass += 'bg-gray-100 dark:bg-gray-700 ';
+    } else {
+      dayClass += 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 ';
     }
 
-    // Add days of the month
-    for (let day = 1; day <= daysInMonth; day++) {
-      const dateString = formatDate(day);
-      const currentDate = new Date(year, month, day - 1);
-      const entry = entriesByDate.get(dateString);
-      const status = getEntryStatus(entry);
-      const isSelected = selectedDate === dateString;
-      const isToday = dateString === new Date().toISOString().split('T')[0];
-      const isWeekendDay = isWeekend(new Date(year, month, day));
-      const tradingHoliday = getTradingHoliday(dateString);
-      const isNonTradingDay = isWeekendDay || tradingHoliday;
+    if (entry) {
+      if (entry.realized_pnl > 0) {
+        dayClass += 'border-l-4 border-l-green-500 ';
+      } else if (entry.realized_pnl < 0) {
+        dayClass += 'border-l-4 border-l-red-500 ';
+      }
+    }
 
-      const handleCellClick = () => {
-        if (isNonTradingDay) return;
-        
-        if (entry) {
-          // If entry exists, select it for viewing/editing
-          onDateSelect(dateString);
-        } else {
-          // If no entry exists, trigger add mode
-          onDateAdd(dateString);
-        }
-      };
-      days.push(
-        <div
-          key={day}
-          onClick={handleCellClick}
-          className={`h-24 p-2 border border-gray-200 cursor-pointer transition-all duration-200 hover:bg-gray-50 ${
-            isNonTradingDay 
-              ? 'bg-gray-100 dark:bg-gray-700 cursor-not-allowed' 
-              : entry 
-                ? 'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900' 
-                : 'cursor-pointer hover:bg-green-50 dark:hover:bg-green-900'
-          } ${
-            isSelected && !isNonTradingDay ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900' : ''
-          } ${
-            isToday && !isNonTradingDay ? 'bg-blue-100 dark:bg-blue-800' : ''
-          }`}
-        >
-          <div className="flex flex-col h-full">
-            <span className={`text-sm font-medium ${
-              isNonTradingDay 
-                ? 'text-gray-400 dark:text-gray-500' 
-                : isToday 
-                  ? 'text-blue-600' 
-                  : 'text-gray-900 dark:text-white'
-            }`}>
-              {day}
-            </span>
-            
-            {isNonTradingDay ? (
-              <div className="flex-1 flex flex-col items-center justify-center">
-                <span className="text-xs text-gray-400 dark:text-gray-500 text-center leading-tight">
-                  {tradingHoliday ? tradingHoliday.name : 'Weekend'}
-                </span>
-                <span className="text-xs text-gray-400 dark:text-gray-500 mt-1">No Trading</span>
-              </div>
-            ) : (
-              <>
-                {entry && (
-                  <div className="flex-1 flex flex-col justify-between">
-                    <div className="text-right">
-                      <div
-                        className={`text-xs font-semibold ${
-                          status === 'profit' ? 'text-green-600' :
-                          status === 'loss' ? 'text-red-600' :
-                          'text-gray-600'
-                        }`}
-                      >
-                        R: {formatCurrency(entry.realized_pnl)}
-                      </div>
-                      <div
-                        className={`text-xs ${
-                          entry.paper_pnl > 0 ? 'text-green-500' :
-                          entry.paper_pnl < 0 ? 'text-red-500' :
-                          'text-gray-500'
-                        }`}
-                      >
-                        P: {formatCurrency(entry.paper_pnl)}
-                      </div>
-                      {entry.notes && (
-                        <div className="w-2 h-2 bg-blue-400 rounded-full mt-1 ml-auto"></div>
-                      )}
-                    </div>
-                  </div>
-                )}
-                {!entry && !isNonTradingDay && (
-                  <div className="flex-1 flex items-center justify-center">
-                    <div className="text-gray-400 dark:text-gray-500 text-xs text-center">
-                      Click to add
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-          {status && !isNonTradingDay && (
-            <div className={`w-full h-1 mt-auto rounded ${
-              status === 'profit' ? 'bg-green-500' :
-              status === 'loss' ? 'bg-red-500' :
-              'bg-gray-400'
-            }`}></div>
+    return (
+      <div key={day} className={dayClass}>
+        <div className="flex justify-between items-start mb-1">
+          <span className="text-sm font-medium text-gray-900 dark:text-white">{day}</span>
+          {!isNonTradingDay && !entry && (
+            <button
+              onClick={() => onDateAdd(dateString)}
+              className="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              title="Add entry"
+            >
+              <Plus className="w-3 h-3" />
+            </button>
           )}
         </div>
-      );
-    }
 
-    return days;
+        {isNonTradingDay ? (
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            {isWeekendDay ? 'Weekend' : 'Holiday'}
+            <br />
+            <span className="text-xs">No Trading</span>
+          </div>
+        ) : entry ? (
+          <div
+            className="cursor-pointer"
+            onClick={() => onDateSelect(dateString)}
+          >
+            <div className="text-xs space-y-1">
+              <div className={`font-medium ${
+                entry.realized_pnl >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+              }`}>
+                R: {formatCurrency(entry.realized_pnl)}
+              </div>
+              <div className={`${
+                entry.paper_pnl >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+              }`}>
+                P: {formatCurrency(entry.paper_pnl)}
+              </div>
+              {entry.notes && (
+                <div className="flex items-center text-blue-500 dark:text-blue-400">
+                  <div className="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full"></div>
+                  <span className="ml-1 text-xs">Has Notes</span>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div
+            className="h-full cursor-pointer flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            onClick={() => onDateAdd(dateString)}
+          >
+            <span className="text-xs">Click to add</span>
+          </div>
+        )}
+      </div>
+    );
   };
 
+  const { realized, tradingDays } = getMonthlyTotals();
+  const currentNAV = getCurrentMonthNAV();
+
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 transition-colors duration-200">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg transition-colors duration-200">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-3">
-          <CalendarIcon className="w-6 h-6 text-blue-600" />
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Trading Calendar</h2>
+      <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center">
+            <span className="mr-2">📅</span>
+            Trading Calendar
+          </h2>
+          <button
+            onClick={() => setShowNAVModal(true)}
+            className="flex items-center space-x-2 px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors duration-200"
+          >
+            <Edit className="w-4 h-4" />
+            <span>Edit NAV</span>
+          </button>
         </div>
-        
-        <div className="flex items-center space-x-4">
+
+        <div className="flex items-center justify-between">
           <button
             onClick={() => navigateMonth('prev')}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors duration-200"
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors duration-200"
           >
             <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-gray-300" />
           </button>
           
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white min-w-[140px] text-center">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white">
             {monthNames[month]} {year}
           </h3>
           
           <button
             onClick={() => navigateMonth('next')}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors duration-200"
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors duration-200"
           >
             <ChevronRight className="w-5 h-5 text-gray-600 dark:text-gray-300" />
           </button>
-          
-          {/* Monthly NAV Update Button */}
-          <div className="flex items-center space-x-2 ml-4">
-            <button
-              onClick={() => setShowNAVModal(true)}
-              className="flex items-center space-x-2 px-3 py-2 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors duration-200"
-              title="Update monthly NAV"
-            >
-              <BarChart3 className="w-4 h-4" />
-              <span className="text-sm font-medium">
-                {currentMonthNAV ? 'Edit NAV' : 'Add NAV'}
-              </span>
-            </button>
-          </div>
         </div>
-      </div>
 
-      {/* Monthly Summary */}
-      <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Realized P&L */}
+        {/* Monthly Summary */}
+        <div className="grid grid-cols-2 gap-4 mt-4">
           <div className="text-center">
-            <div className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
-              Realized P&L
-            </div>
-            <div className={`text-lg font-bold ${
-              monthlyTotals.totalRealizedPnL > 0 ? 'text-green-600' :
-              monthlyTotals.totalRealizedPnL < 0 ? 'text-red-600' :
-              'text-gray-600'
+            <div className="text-sm text-gray-600 dark:text-gray-400">Realized P&L</div>
+            <div className={`text-lg font-semibold ${
+              realized >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
             }`}>
-              {formatCurrency(monthlyTotals.totalRealizedPnL)}
+              {formatCurrency(realized)}
             </div>
           </div>
-
-          {/* End-of-Month NAV */}
           <div className="text-center">
-            <div className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
-              End-of-Month NAV
-            </div>
-            <div className="text-lg font-bold text-blue-800 dark:text-blue-400">
-              {currentMonthNAV ? formatCurrency(currentMonthNAV.nav_value) : 'Not Set'}
+            <div className="text-sm text-gray-600 dark:text-gray-400">End-of-Month NAV</div>
+            <div className="text-lg font-semibold text-blue-600 dark:text-blue-400">
+              {currentNAV ? formatCurrency(currentNAV.nav_value) : 'Not Set'}
             </div>
           </div>
         </div>
 
-        {/* Trading Days Count */}
-        <div className="mt-3 text-center">
-          <span className="text-sm text-gray-600 dark:text-gray-400">
-            Trading Days: <span className="font-medium">{monthlyTotals.entryCount}</span>
-          </span>
+        <div className="text-center mt-2">
+          <div className="text-sm text-gray-600 dark:text-gray-400">
+            Trading Days: {tradingDays}
+          </div>
         </div>
       </div>
+
       {/* Legend */}
-      <div className="flex flex-wrap items-center justify-center gap-6 mb-4 text-sm text-gray-600 dark:text-gray-300">
-        <div className="flex items-center space-x-2">
-          <div className="w-3 h-3 bg-green-500 rounded"></div>
-          <span>Profit</span>
+      <div className="px-6 py-3 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 transition-colors duration-200">
+        <div className="flex flex-wrap items-center justify-center space-x-4 text-xs">
+          <div className="flex items-center space-x-1">
+            <div className="w-3 h-3 bg-green-500 rounded"></div>
+            <span className="text-gray-600 dark:text-gray-300">Profit</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <div className="w-3 h-3 bg-red-500 rounded"></div>
+            <span className="text-gray-600 dark:text-gray-300">Loss</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+            <span className="text-gray-600 dark:text-gray-300">Has Notes</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <div className="w-3 h-3 bg-gray-300 dark:bg-gray-600 rounded"></div>
+            <span className="text-gray-600 dark:text-gray-300">Non-Trading Day</span>
+          </div>
+          <span className="text-gray-500 dark:text-gray-400">Weekends & NASDAQ Holidays</span>
+          <span className="text-gray-500 dark:text-gray-400">R: Realized | P: Paper</span>
         </div>
-        <div className="flex items-center space-x-2">
-          <div className="w-3 h-3 bg-red-500 rounded"></div>
-          <span>Loss</span>
-        </div>
-        <div className="flex items-center space-x-2">
-          <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-          <span>Has Notes</span>
-        </div>
-        <div className="flex items-center space-x-2">
-          <div className="w-3 h-3 bg-gray-100 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded"></div>
-          <span>Non-Trading Day</span>
-        </div>
-        <div className="text-xs text-gray-600 dark:text-gray-400">
-          Weekends & NASDAQ Holidays
-        </div>
-        <div className="text-xs text-gray-600 dark:text-gray-400">R: Realized | P: Paper</div>
       </div>
 
       {/* Calendar Grid */}
-      <div className="grid grid-cols-7 gap-0 border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
-        {/* Week day headers */}
-        {weekDays.map(day => (
-          <div key={day} className="bg-gray-100 dark:bg-gray-700 p-3 text-center text-sm font-medium text-gray-700 dark:text-gray-300">
-            {day}
-          </div>
-        ))}
-        
-        {/* Calendar days */}
-        {renderCalendarDays()}
+      <div className="p-6">
+        {/* Day Headers */}
+        <div className="grid grid-cols-7 gap-1 mb-2">
+          {dayNames.map(day => (
+            <div key={day} className="text-center text-sm font-medium text-gray-600 dark:text-gray-300 py-2">
+              {day}
+            </div>
+          ))}
+        </div>
+
+        {/* Calendar Days */}
+        <div className="grid grid-cols-7 gap-1">
+          {/* Empty cells for days before the first day of the month */}
+          {Array.from({ length: firstDayOfWeek }, (_, i) => (
+            <div key={`empty-${i}`} className="h-24"></div>
+          ))}
+          
+          {/* Days of the month */}
+          {Array.from({ length: daysInMonth }, (_, i) => renderCalendarDay(i + 1))}
+        </div>
       </div>
 
       {/* Monthly NAV Modal */}
@@ -336,12 +280,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         <MonthlyNAVModal
           year={year}
           month={month + 1}
-          monthName={monthNames[month]}
-          currentValue={currentMonthNAV?.nav_value}
-          onSave={handleNAVUpdate}
+          currentValue={currentNAV?.nav_value}
+          onSave={onUpdateNAV}
           onClose={() => setShowNAVModal(false)}
         />
       )}
     </div>
   );
-};
+}
