@@ -1,0 +1,254 @@
+import React, { useState } from 'react';
+import { Upload, X, Download, AlertCircle, CheckCircle } from 'lucide-react';
+import { TradingEntry } from '../types/trading';
+
+interface BulkUploadProps {
+  onUpload: (entries: Omit<TradingEntry, 'id' | 'created_at' | 'updated_at'>[]) => Promise<void>;
+  onUpdateEntries: (updates: { id: string; data: Partial<TradingEntry> }[]) => Promise<void>;
+  existingEntries: TradingEntry[];
+  onClose: () => void;
+}
+
+export const BulkUpload: React.FC<BulkUploadProps> = ({
+  onUpload,
+  onUpdateEntries,
+  existingEntries,
+  onClose,
+}) => {
+  const [csvData, setCsvData] = useState('');
+  const [parsedEntries, setParsedEntries] = useState<any[]>([]);
+  const [conflicts, setConflicts] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const downloadTemplate = () => {
+    const template = `date,realized_pnl,paper_pnl,notes
+2025-01-15,1500.00,-500.00,Good trading day
+2025-01-16,-800.00,200.00,Stopped out early`;
+    
+    const blob = new Blob([template], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'trading_entries_template.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const parseCsv = (csv: string) => {
+    const lines = csv.trim().split('\n');
+    if (lines.length < 2) {
+      throw new Error('CSV must have at least a header row and one data row');
+    }
+
+    const headers = lines[0].split(',').map(h => h.trim());
+    const requiredHeaders = ['date', 'realized_pnl', 'paper_pnl'];
+    
+    for (const required of requiredHeaders) {
+      if (!headers.includes(required)) {
+        throw new Error(`Missing required column: ${required}`);
+      }
+    }
+
+    const entries = [];
+    const conflicts = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(',').map(v => v.trim());
+      const entry: any = {};
+
+      headers.forEach((header, index) => {
+        if (header === 'realized_pnl' || header === 'paper_pnl') {
+          entry[header] = parseFloat(values[index]) || 0;
+        } else {
+          entry[header] = values[index] || '';
+        }
+      });
+
+      // Check for conflicts with existing entries
+      const existingEntry = existingEntries.find(e => e.date === entry.date);
+      if (existingEntry) {
+        conflicts.push({
+          ...entry,
+          existingEntry,
+          action: 'update'
+        });
+      } else {
+        entries.push(entry);
+      }
+    }
+
+    return { entries, conflicts };
+  };
+
+  const handleCsvChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const csv = e.target.value;
+    setCsvData(csv);
+    
+    if (csv.trim()) {
+      try {
+        const { entries, conflicts } = parseCsv(csv);
+        setParsedEntries(entries);
+        setConflicts(conflicts);
+        setError('');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to parse CSV');
+        setParsedEntries([]);
+        setConflicts([]);
+      }
+    } else {
+      setParsedEntries([]);
+      setConflicts([]);
+      setError('');
+    }
+  };
+
+  const handleUpload = async () => {
+    if (parsedEntries.length === 0 && conflicts.length === 0) {
+      setError('No valid entries to upload');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      
+      // Upload new entries
+      if (parsedEntries.length > 0) {
+        await onUpload(parsedEntries);
+      }
+
+      // Update conflicting entries
+      if (conflicts.length > 0) {
+        const updates = conflicts.map(conflict => ({
+          id: conflict.existingEntry.id,
+          data: {
+            realized_pnl: conflict.realized_pnl,
+            paper_pnl: conflict.paper_pnl,
+            notes: conflict.notes
+          }
+        }));
+        await onUpdateEntries(updates);
+      }
+
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-3">
+            <Upload className="w-6 h-6 text-blue-600" />
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              Bulk Upload Trading Entries
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Upload multiple trading entries using CSV format
+            </p>
+            <button
+              onClick={downloadTemplate}
+              className="flex items-center space-x-2 px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              <span>Download Template</span>
+            </button>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              CSV Data
+            </label>
+            <textarea
+              rows={10}
+              value={csvData}
+              onChange={handleCsvChange}
+              placeholder="Paste your CSV data here or use the template format..."
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+          </div>
+
+          {error && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-3">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+              </div>
+            </div>
+          )}
+
+          {(parsedEntries.length > 0 || conflicts.length > 0) && (
+            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md p-3">
+              <div className="flex items-center space-x-2 mb-2">
+                <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+                <p className="text-sm font-medium text-green-600 dark:text-green-400">
+                  CSV Parsed Successfully
+                </p>
+              </div>
+              <div className="text-sm text-green-600 dark:text-green-400">
+                <p>New entries: {parsedEntries.length}</p>
+                <p>Updates to existing entries: {conflicts.length}</p>
+              </div>
+            </div>
+          )}
+
+          {conflicts.length > 0 && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md p-3">
+              <h4 className="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-2">
+                Conflicting Entries (will be updated):
+              </h4>
+              <div className="space-y-1 text-xs text-yellow-700 dark:text-yellow-300">
+                {conflicts.map((conflict, index) => (
+                  <p key={index}>
+                    {conflict.date}: ${conflict.realized_pnl} (was ${conflict.existingEntry.realized_pnl})
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleUpload}
+              disabled={isLoading || (parsedEntries.length === 0 && conflicts.length === 0)}
+              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+            >
+              {isLoading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <span>Uploading...</span>
+                </>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4" />
+                  <span>Upload Entries</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
