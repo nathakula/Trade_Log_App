@@ -97,6 +97,12 @@ function App() {
     await updateBulkNAV(updates);
   };
 
+  const formMode = selectedEntry ? 'edit' : 'add';
+  
+  const handleFormCancel = () => {
+    setSelectedDate('');
+  };
+
   const selectedEntry = entries.find(entry => entry.date === selectedDate);
 
   const navItems = [
