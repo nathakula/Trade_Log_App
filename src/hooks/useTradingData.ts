@@ -54,13 +54,38 @@ export const useTradingData = () => {
     console.log('NAV records:', navData.length);
     console.log('NAV data:', navData);
 
-    // First, process trading entries
+    // First, process all NAV data to create month entries
+    navData.forEach(nav => {
+      const monthKey = `${nav.year}-${nav.month}`;
+      console.log('Processing NAV for month:', monthKey, 'value:', nav.nav_value);
+      
+      if (!monthlyMap.has(monthKey)) {
+        const date = new Date(nav.year, nav.month - 1);
+        monthlyMap.set(monthKey, {
+          month: date.toLocaleString('default', { month: 'short' }),
+          year: nav.year,
+          total_realized_pnl: 0,
+          total_paper_pnl: 0,
+          end_of_month_nav: nav.nav_value,
+          entry_count: 0,
+        });
+        console.log('✓ Created new month entry with NAV:', monthKey, 'NAV:', nav.nav_value);
+      } else {
+        // Update existing month with NAV data
+        const monthData = monthlyMap.get(monthKey)!;
+        monthData.end_of_month_nav = nav.nav_value;
+        console.log('✓ Updated existing month with NAV:', monthKey, 'NAV:', nav.nav_value);
+      }
+    });
+
+    // Then, process trading entries and add P&L data
     entries.forEach((entry) => {
       const date = new Date(entry.date);
       const monthKey = `${date.getFullYear()}-${date.getMonth() + 1}`;
       console.log('Processing entry for month:', monthKey);
       
       if (!monthlyMap.has(monthKey)) {
+        // This shouldn't happen now since we process NAV first, but keep as fallback
         monthlyMap.set(monthKey, {
           month: date.toLocaleString('default', { month: 'short' }),
           year: date.getFullYear(),
@@ -77,23 +102,6 @@ export const useTradingData = () => {
       monthData.entry_count += 1;
     });
 
-    // Then, process NAV data - only add NAV to existing months with trading entries
-    navData.forEach(nav => {
-      const monthKey = `${nav.year}-${nav.month}`;
-      console.log('Processing NAV for month:', monthKey, 'value:', nav.nav_value, 'has trading entries:', monthlyMap.has(monthKey));
-      
-      if (monthlyMap.has(monthKey)) {
-        // Update existing month that has trading entries with NAV data
-        const monthData = monthlyMap.get(monthKey)!;
-        monthData.end_of_month_nav = nav.nav_value;
-        console.log('✓ Updated existing month with NAV:', monthKey, 'NAV:', nav.nav_value);
-      } else {
-        console.log('⚠️ NAV data for month without trading entries:', monthKey, 'NAV:', nav.nav_value);
-      }
-      // Note: We no longer add NAV-only months to the monthly breakdown
-      // NAV data is only used for the current NAV display in summary cards
-    });
-    
     console.log('Final monthly map:', Array.from(monthlyMap.entries()));
     
     const sortedMonthlyData = Array.from(monthlyMap.values()).sort((a, b) => {
