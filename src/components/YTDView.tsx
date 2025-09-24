@@ -200,36 +200,23 @@ export const YTDView: React.FC<YTDViewProps> = ({ monthlyData, entries }) => {
                   )}
                   
                   {/* NAV Line */}
-                  {monthlyData.filter(month => month.end_of_month_nav > 0).length > 1 ? (
+                  {monthlyData.filter(month => month.end_of_month_nav > 0).length > 0 && (
                     <path
                       fill="none"
                       stroke="#3b82f6"
-                      strokeWidth="3"
+                      strokeWidth="4"
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      filter="drop-shadow(0 2px 4px rgba(59, 130, 246, 0.3))"
-                      d={`M ${monthlyData
+                      filter="drop-shadow(0 3px 6px rgba(59, 130, 246, 0.4))"
+                      d={monthlyData.filter(month => month.end_of_month_nav > 0).length === 1 
+                        ? `M 50%,${100 - ((monthlyData.filter(month => month.end_of_month_nav > 0)[0].end_of_month_nav - navRange.min) / (navRange.max - navRange.min)) * 100}% L 50%,${100 - ((monthlyData.filter(month => month.end_of_month_nav > 0)[0].end_of_month_nav - navRange.min) / (navRange.max - navRange.min)) * 100}%`
+                        : `M ${monthlyData
                         .filter(month => month.end_of_month_nav > 0)
                         .map((month, index, filteredData) => {
                           const x = filteredData.length > 1 ? (index / (filteredData.length - 1)) * 100 : 50;
                           const y = 100 - ((month.end_of_month_nav - navRange.min) / (navRange.max - navRange.min)) * 100;
                           return `${x}%,${Math.max(0, Math.min(100, y))}%`;
                         }).join(' L ')}`}
-                    />
-                  ) : (
-                    <polyline
-                      fill="none"
-                      stroke="#3b82f6"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      points={monthlyData
-                        .filter(month => month.end_of_month_nav > 0)
-                        .map((month, index, filteredData) => {
-                          const x = filteredData.length > 1 ? (index / (filteredData.length - 1)) * 100 : 50;
-                          const y = 100 - ((month.end_of_month_nav - navRange.min) / (navRange.max - navRange.min)) * 100;
-                          return `${x}%,${Math.max(0, Math.min(100, y))}%`;
-                        }).join(' ')}
                     />
                   )}
                   
@@ -244,12 +231,15 @@ export const YTDView: React.FC<YTDViewProps> = ({ monthlyData, entries }) => {
                         key={`nav-${index}`}
                         cx={`${x}%`}
                         cy={`${Math.max(0, Math.min(100, y))}%`}
-                        r="5"
+                        r="6"
                         fill="#3b82f6"
                         stroke={theme === 'dark' ? '#1e293b' : '#ffffff'}
-                        strokeWidth="3"
-                        className="hover:r-7 transition-all duration-200 cursor-pointer"
-                        filter="drop-shadow(0 2px 4px rgba(59, 130, 246, 0.4))"
+                        strokeWidth="4"
+                        className="transition-all duration-200 cursor-pointer hover:r-8"
+                        filter="drop-shadow(0 3px 6px rgba(59, 130, 246, 0.5))"
+                        style={{
+                          transition: 'r 0.2s ease-in-out'
+                        }}
                       />
                     );
                   })}
