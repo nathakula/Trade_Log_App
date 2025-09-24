@@ -208,15 +208,20 @@ export const YTDView: React.FC<YTDViewProps> = ({ monthlyData, entries }) => {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       filter="drop-shadow(0 3px 6px rgba(59, 130, 246, 0.4))"
-                      d={monthlyData.filter(month => month.end_of_month_nav > 0).length === 1 
-                        ? `M 50%,${100 - ((monthlyData.filter(month => month.end_of_month_nav > 0)[0].end_of_month_nav - navRange.min) / (navRange.max - navRange.min)) * 100}% L 50%,${100 - ((monthlyData.filter(month => month.end_of_month_nav > 0)[0].end_of_month_nav - navRange.min) / (navRange.max - navRange.min)) * 100}%`
-                        : `M ${monthlyData
-                        .filter(month => month.end_of_month_nav > 0)
-                        .map((month, index, filteredData) => {
-                          const x = filteredData.length > 1 ? (index / (filteredData.length - 1)) * 100 : 50;
+                      d={(() => {
+                        const navData = monthlyData.filter(month => month.end_of_month_nav > 0);
+                        if (navData.length === 0) return '';
+                        if (navData.length === 1) {
+                          const x = 50;
+                          const y = 100 - ((navData[0].end_of_month_nav - navRange.min) / (navRange.max - navRange.min)) * 100;
+                          return `M ${x}%,${Math.max(0, Math.min(100, y))}% L ${x}%,${Math.max(0, Math.min(100, y))}%`;
+                        }
+                        return `M ${navData.map((month, index) => {
+                          const x = (index / (navData.length - 1)) * 100;
                           const y = 100 - ((month.end_of_month_nav - navRange.min) / (navRange.max - navRange.min)) * 100;
                           return `${x}%,${Math.max(0, Math.min(100, y))}%`;
-                        }).join(' L ')}`}
+                        }).join(' L ')}`;
+                      })()}
                     />
                   )}
                   
@@ -231,15 +236,11 @@ export const YTDView: React.FC<YTDViewProps> = ({ monthlyData, entries }) => {
                         key={`nav-${index}`}
                         cx={`${x}%`}
                         cy={`${Math.max(0, Math.min(100, y))}%`}
-                        r="6"
+                        r="4"
                         fill="#3b82f6"
                         stroke={theme === 'dark' ? '#1e293b' : '#ffffff'}
-                        strokeWidth="4"
-                        className="transition-all duration-200 cursor-pointer hover:r-8"
+                        strokeWidth="2"
                         filter="drop-shadow(0 3px 6px rgba(59, 130, 246, 0.5))"
-                        style={{
-                          transition: 'r 0.2s ease-in-out'
-                        }}
                       />
                     );
                   })}
@@ -298,25 +299,11 @@ export const YTDView: React.FC<YTDViewProps> = ({ monthlyData, entries }) => {
                 </div>
               </div>
               <div className="flex flex-col items-end space-y-1">
-                <span className={`font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>EOD NAV ($)</span>
+                <span className={`font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>END-OF-MONTH NAV ($)</span>
                 <div className="flex items-center space-x-2">
                   <span>NAV Trend</span>
                   <div className="w-4 h-0.5 bg-blue-500 rounded-full"></div>
                 </div>
-              </div>
-            </div>
-
-            {/* Bottom Labels */}
-            <div className={`flex justify-between text-xs px-12 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-600'}`}>
-              <span>$(5,000)</span>
-              <span className="ml-auto">$0.00</span>
-            </div>
-            
-            {/* Negative P&L indicator */}
-            <div className={`absolute bottom-2 left-12 text-xs ${theme === 'dark' ? 'text-gray-500' : 'text-gray-600'}`}>
-              <div className="flex items-center space-x-1">
-                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                <span>Negative P&L</span>
               </div>
             </div>
           </div>
