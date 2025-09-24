@@ -12,17 +12,34 @@ export const YTDView: React.FC<YTDViewProps> = ({ monthlyData, entries }) => {
   const { theme } = useTheme();
   const currentYear = new Date().getFullYear();
   
+  console.log('YTDView - monthlyData:', monthlyData);
+  console.log('YTDView - entries:', entries);
+  
   const totalRealizedPnL = monthlyData.reduce((sum, month) => sum + month.total_realized_pnl, 0);
   const totalEntries = entries.length;
   
   // Get the most recent NAV value
-  const currentNAV = monthlyData.length > 0 
-    ? monthlyData.sort((a, b) => {
-        if (a.year !== b.year) return b.year - a.year;
-        const monthOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        return monthOrder.indexOf(b.month) - monthOrder.indexOf(a.month);
-      })[0].end_of_month_nav 
-    : 250000;
+  const getCurrentNAV = () => {
+    console.log('Getting current NAV from monthlyData:', monthlyData);
+    
+    if (monthlyData.length === 0) {
+      console.log('No monthly data, using default NAV: 250000');
+      return 250000;
+    }
+    
+    const sortedData = [...monthlyData].sort((a, b) => {
+      if (a.year !== b.year) return b.year - a.year;
+      const monthOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return monthOrder.indexOf(b.month) - monthOrder.indexOf(a.month);
+    });
+    
+    console.log('Sorted monthly data:', sortedData);
+    const latestNAV = sortedData[0].end_of_month_nav;
+    console.log('Latest NAV:', latestNAV);
+    return latestNAV;
+  };
+  
+  const currentNAV = getCurrentNAV();
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {

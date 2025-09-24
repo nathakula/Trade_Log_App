@@ -33,10 +33,11 @@ export const useTradingData = () => {
       const { data, error } = await supabase
         .from('monthly_nav')
         .select('*')
-        .order('year', { ascending: true })
-        .order('month', { ascending: true });
+        .order('year', { ascending: false })
+        .order('month', { ascending: false });
 
       if (error) throw error;
+      console.log('Fetched NAV data:', data);
       setMonthlyNAV(data || []);
       return data || [];
     } catch (err) {
@@ -48,7 +49,10 @@ export const useTradingData = () => {
   const calculateMonthlyData = (entries: TradingEntry[], navData: MonthlyNAV[]) => {
     const monthlyMap = new Map<string, MonthlyData>();
     
-    console.log('Calculating monthly data with entries:', entries.length, 'NAV records:', navData.length);
+    console.log('=== CALCULATING MONTHLY DATA ===');
+    console.log('Trading entries:', entries.length);
+    console.log('NAV records:', navData.length);
+    console.log('NAV data:', navData);
 
     // First, process trading entries
     entries.forEach((entry) => {
@@ -76,13 +80,15 @@ export const useTradingData = () => {
     // Then, process NAV data - only add NAV to existing months with trading entries
     navData.forEach(nav => {
       const monthKey = `${nav.year}-${nav.month}`;
-      console.log('Processing NAV for month:', monthKey, 'value:', nav.nav_value);
+      console.log('Processing NAV for month:', monthKey, 'value:', nav.nav_value, 'has trading entries:', monthlyMap.has(monthKey));
       
       if (monthlyMap.has(monthKey)) {
         // Update existing month that has trading entries with NAV data
         const monthData = monthlyMap.get(monthKey)!;
         monthData.end_of_month_nav = nav.nav_value;
-        console.log('Updated existing month with NAV:', monthKey);
+        console.log('✓ Updated existing month with NAV:', monthKey, 'NAV:', nav.nav_value);
+      } else {
+        console.log('⚠️ NAV data for month without trading entries:', monthKey, 'NAV:', nav.nav_value);
       }
       // Note: We no longer add NAV-only months to the monthly breakdown
       // NAV data is only used for the current NAV display in summary cards
