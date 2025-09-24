@@ -12,12 +12,14 @@ export const useTradingData = () => {
   const fetchEntries = async () => {
     try {
       setLoading(true);
+      console.log('=== FETCHING FRESH DATA ===');
       const { data, error } = await supabase
         .from('trading_entries')
         .select('*')
         .order('date', { ascending: false });
 
       if (error) throw error;
+      console.log('Fetched entries from DB:', data?.length);
       setEntries(data || []);
       const navData = await fetchMonthlyNAV();
       calculateMonthlyData(data || [], navData);
@@ -52,12 +54,10 @@ export const useTradingData = () => {
     console.log('=== CALCULATING MONTHLY DATA ===');
     console.log('Trading entries:', entries.length);
     console.log('NAV records:', navData.length);
-    console.log('NAV data:', navData);
 
     // First, process all NAV data to create month entries
     navData.forEach(nav => {
       const monthKey = `${nav.year}-${nav.month}`;
-      console.log('Processing NAV for month:', monthKey, 'value:', nav.nav_value);
       
       if (!monthlyMap.has(monthKey)) {
         const date = new Date(nav.year, nav.month - 1);
@@ -69,23 +69,30 @@ export const useTradingData = () => {
           end_of_month_nav: nav.nav_value,
           entry_count: 0,
         });
-        console.log('✓ Created new month entry with NAV:', monthKey, 'NAV:', nav.nav_value);
       } else {
         // Update existing month with NAV data
         const monthData = monthlyMap.get(monthKey)!;
         monthData.end_of_month_nav = nav.nav_value;
-        console.log('✓ Updated existing month with NAV:', monthKey, 'NAV:', nav.nav_value);
       }
     });
 
-    // Then, process trading entries and add P&L data
+    // Then, process trading entries and add P&L data (ensuring no duplicates)
+    const processedEntries = new Set<string>(); // Track processed entry IDs
+    
     entries.forEach((entry) => {
+      // Skip if we've already processed this entry (prevent duplicates)
+      if (processedEntries.has(entry.id)) {
+        console.warn('Skipping duplicate entry:', entry.id, entry.date);
+        return;
+      }
+      processedEntries.add(entry.id);
+      
       const date = new Date(entry.date);
       const monthKey = `${date.getFullYear()}-${date.getMonth() + 1}`;
-      console.log('Processing entry for month:', monthKey);
+      console.log('Processing entry:', entry.date, 'P&L:', entry.realized_pnl, 'Month:', monthKey);
       
       if (!monthlyMap.has(monthKey)) {
-        // This shouldn't happen now since we process NAV first, but keep as fallback
+        // Create month entry if it doesn't exist (fallback for months without NAV)
         monthlyMap.set(monthKey, {
           month: date.toLocaleString('default', { month: 'short' }),
           year: date.getFullYear(),
@@ -102,6 +109,11 @@ export const useTradingData = () => {
       monthData.entry_count += 1;
     });
 
+    // Log final totals for verification
+    monthlyMap.forEach((data, key) => {
+      console.log(`Month ${key}: Realized P&L = ${data.total_realized_pnl}, Entry Count = ${data.entry_count}`);
+    });
+    
     console.log('Final monthly map:', Array.from(monthlyMap.entries()));
     
     const sortedMonthlyData = Array.from(monthlyMap.values()).sort((a, b) => {
@@ -115,6 +127,7 @@ export const useTradingData = () => {
 
   // Auto-refresh monthly data when entries or NAV changes
   useEffect(() => {
+    console.log('=== USEEFFECT TRIGGERED ===');
     console.log('useEffect triggered - entries:', entries.length, 'NAV:', monthlyNAV.length);
     if (entries.length >= 0 && monthlyNAV.length >= 0) { // Changed from > 0 to >= 0 to handle empty states
       calculateMonthlyData(entries, monthlyNAV);
@@ -140,12 +153,15 @@ export const useTradingData = () => {
 
   const addBulkEntries = async (entries: Omit<TradingEntry, 'id' | 'created_at' | 'updated_at'>[]) => {
     try {
+      console.log('=== ADDING BULK ENTRIES ===');
+      console.log('Entries to add:', entries.length);
       const { data, error } = await supabase
         .from('trading_entries')
         .insert(entries)
         .select();
 
       if (error) throw error;
+      console.log('Successfully added bulk entries:', data?.length);
       await fetchEntries(); // This will trigger YTD refresh via useEffect
       return data;
     } catch (err) {
@@ -156,6 +172,8 @@ export const useTradingData = () => {
 
   const updateBulkEntries = async (updates: { id: string; data: Partial<TradingEntry> }[]) => {
     try {
+      console.log('=== UPDATING BULK ENTRIES ===');
+      console.log('Updates to apply:', updates.length);
       const promises = updates.map(update => 
         supabase
           .from('trading_entries')
@@ -172,6 +190,7 @@ export const useTradingData = () => {
         if (result.error) throw result.error;
       });
 
+      console.log('Successfully updated bulk entries');
       await fetchEntries(); // This will trigger YTD refresh via useEffect
       return results.map(result => result.data);
     } catch (err) {
