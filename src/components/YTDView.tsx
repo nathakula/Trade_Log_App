@@ -58,17 +58,30 @@ export const YTDView: React.FC<YTDViewProps> = ({ monthlyData, entries }) => {
 
   const getMaxValue = () => {
     const pnlValues = monthlyData.map(d => Math.abs(d.total_realized_pnl));
-    const navValues = monthlyData.map(d => d.end_of_month_nav);
-    return Math.max(...pnlValues, ...navValues);
+    return Math.max(...pnlValues, 50000); // Use a reasonable max for P&L bars
   };
 
-  const maxValue = getMaxValue();
+  const maxPnLValue = getMaxValue();
+  
+  // Calculate NAV range for the line chart
+  const getNavRange = () => {
+    const navValues = monthlyData.filter(d => d.end_of_month_nav > 0).map(d => d.end_of_month_nav);
+    if (navValues.length === 0) return { min: 250000, max: 400000 };
+    
+    const minNav = Math.min(...navValues);
+    const maxNav = Math.max(...navValues);
+    const padding = (maxNav - minNav) * 0.1; // 10% padding
+    
+    return {
+      min: Math.max(0, minNav - padding),
+      max: maxNav + padding
+    };
+  };
+  
+  const navRange = getNavRange();
 
   const getBarHeight = (value: number, isNAV = false) => {
-    if (isNAV) {
-      return Math.max((value / maxValue) * 200, 20);
-    }
-    return Math.max((Math.abs(value) / maxValue) * 200, 8);
+    return Math.max((Math.abs(value) / maxPnLValue) * 200, 8);
   };
 
   return (
@@ -147,12 +160,12 @@ export const YTDView: React.FC<YTDViewProps> = ({ monthlyData, entries }) => {
                 
                 {/* Y-axis labels for NAV (right) */}
                 <g className={`text-xs ${theme === 'dark' ? 'fill-gray-400' : 'fill-gray-600'}`}>
-                  <text x="calc(100% - 10px)" y="20" textAnchor="end">$400,000.00</text>
-                  <text x="calc(100% - 10px)" y="84" textAnchor="end">$350,000.00</text>
-                  <text x="calc(100% - 10px)" y="148" textAnchor="end">$300,000.00</text>
-                  <text x="calc(100% - 10px)" y="212" textAnchor="end">$250,000.00</text>
-                  <text x="calc(100% - 10px)" y="276" textAnchor="end">$200,000.00</text>
-                  <text x="calc(100% - 10px)" y="340" textAnchor="end">$150,000.00</text>
+                  <text x="calc(100% - 10px)" y="20" textAnchor="end">${Math.round(navRange.max).toLocaleString()}</text>
+                  <text x="calc(100% - 10px)" y="84" textAnchor="end">${Math.round(navRange.max * 0.83).toLocaleString()}</text>
+                  <text x="calc(100% - 10px)" y="148" textAnchor="end">${Math.round(navRange.max * 0.67).toLocaleString()}</text>
+                  <text x="calc(100% - 10px)" y="212" textAnchor="end">${Math.round(navRange.max * 0.5).toLocaleString()}</text>
+                  <text x="calc(100% - 10px)" y="276" textAnchor="end">${Math.round(navRange.max * 0.33).toLocaleString()}</text>
+                  <text x="calc(100% - 10px)" y="340" textAnchor="end">${Math.round(navRange.min).toLocaleString()}</text>
                 </g>
               </svg>
               
@@ -174,17 +187,21 @@ export const YTDView: React.FC<YTDViewProps> = ({ monthlyData, entries }) => {
                     strokeWidth="3"
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    points={monthlyData.map((month, index) => {
-                      const x = (index / (monthlyData.length - 1)) * 100;
-                      const y = 100 - ((month.end_of_month_nav - 150000) / (400000 - 150000)) * 100;
-                      return `${x}%,${Math.max(0, Math.min(100, y))}%`;
-                    }).join(' ')}
+                    points={monthlyData
+                      .filter(month => month.end_of_month_nav > 0)
+                      .map((month, index, filteredData) => {
+                        const x = filteredData.length > 1 ? (index / (filteredData.length - 1)) * 100 : 50;
+                        const y = 100 - ((month.end_of_month_nav - navRange.min) / (navRange.max - navRange.min)) * 100;
+                        return `${x}%,${Math.max(0, Math.min(100, y))}%`;
+                      }).join(' ')}
                   />
                   
                   {/* NAV Points */}
-                  {monthlyData.map((month, index) => {
-                    const x = (index / (monthlyData.length - 1)) * 100;
-                    const y = 100 - ((month.end_of_month_nav - 150000) / (400000 - 150000)) * 100;
+                  {monthlyData
+                    .filter(month => month.end_of_month_nav > 0)
+                    .map((month, index, filteredData) => {
+                    const x = filteredData.length > 1 ? (index / (filteredData.length - 1)) * 100 : 50;
+                    const y = 100 - ((month.end_of_month_nav - navRange.min) / (navRange.max - navRange.min)) * 100;
                     return (
                       <circle
                         key={`nav-${index}`}
@@ -202,8 +219,7 @@ export const YTDView: React.FC<YTDViewProps> = ({ monthlyData, entries }) => {
                 
                 {/* P&L Bars */}
                 {monthlyData.map((month, index) => {
-                  const maxPnL = Math.max(...monthlyData.map(m => Math.abs(m.total_realized_pnl)));
-                  const barHeight = Math.max((Math.abs(month.total_realized_pnl) / maxPnL) * 240, 8);
+                  const barHeight = Math.max((Math.abs(month.total_realized_pnl) / maxPnLValue) * 240, 8);
                   const isProfit = month.total_realized_pnl >= 0;
                   
                   return (
