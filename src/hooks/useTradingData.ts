@@ -114,6 +114,13 @@ export function useTradingData() {
 
   const addEntry = async (entry: Omit<TradingEntry, 'id' | 'created_at' | 'updated_at'>) => {
     try {
+      // Set user context for RLS policies
+      await supabase.rpc('set_config', {
+        setting_name: 'app.current_user_id',
+        setting_value: 'demo-user-id',
+        is_local: true
+      });
+
       const { data, error } = await supabase
         .from('trading_entries')
         .insert([entry])
@@ -132,6 +139,13 @@ export function useTradingData() {
 
   const updateEntry = async (id: string, updates: Partial<TradingEntry>) => {
     try {
+      // Set user context for RLS policies
+      await supabase.rpc('set_config', {
+        setting_name: 'app.current_user_id',
+        setting_value: 'demo-user-id',
+        is_local: true
+      });
+
       const { data, error } = await supabase
         .from('trading_entries')
         .update(updates)
@@ -151,6 +165,13 @@ export function useTradingData() {
 
   const deleteEntry = async (id: string) => {
     try {
+      // Set user context for RLS policies
+      await supabase.rpc('set_config', {
+        setting_name: 'app.current_user_id',
+        setting_value: 'demo-user-id',
+        is_local: true
+      });
+
       const { error } = await supabase
         .from('trading_entries')
         .delete()
@@ -167,6 +188,13 @@ export function useTradingData() {
 
   const addBulkEntries = async (entries: any[]) => {
     try {
+      // Set user context for RLS policies
+      await supabase.rpc('set_config', {
+        setting_name: 'app.current_user_id',
+        setting_value: 'demo-user-id',
+        is_local: true
+      });
+
       const { data, error } = await supabase
         .from('trading_entries')
         .insert(entries)
@@ -184,6 +212,13 @@ export function useTradingData() {
 
   const updateBulkEntries = async (updates: { id: string; data: Partial<TradingEntry> }[]) => {
     try {
+      // Set user context for RLS policies
+      await supabase.rpc('set_config', {
+        setting_name: 'app.current_user_id',
+        setting_value: 'demo-user-id',
+        is_local: true
+      });
+
       for (const update of updates) {
         await supabase
           .from('trading_entries')
@@ -200,6 +235,13 @@ export function useTradingData() {
 
   const addBulkNAV = async (navEntries: any[]) => {
     try {
+      // Set user context for RLS policies
+      await supabase.rpc('set_config', {
+        setting_name: 'app.current_user_id',
+        setting_value: 'demo-user-id',
+        is_local: true
+      });
+
       const { data, error } = await supabase
         .from('monthly_nav')
         .insert(navEntries)
@@ -217,6 +259,13 @@ export function useTradingData() {
 
   const updateBulkNAV = async (updates: { id: string; data: Partial<MonthlyNAV> }[]) => {
     try {
+      // Set user context for RLS policies
+      await supabase.rpc('set_config', {
+        setting_name: 'app.current_user_id',
+        setting_value: 'demo-user-id',
+        is_local: true
+      });
+
       for (const update of updates) {
         await supabase
           .from('monthly_nav')
@@ -233,6 +282,13 @@ export function useTradingData() {
 
   const updateMonthlyNAV = async (year: number, month: number, navValue: number) => {
     try {
+      // Set user context for RLS policies
+      await supabase.rpc('set_config', {
+        setting_name: 'app.current_user_id',
+        setting_value: 'demo-user-id',
+        is_local: true
+      });
+
       const { data, error } = await supabase
         .from('monthly_nav')
         .upsert({ year, month, nav_value: navValue })
